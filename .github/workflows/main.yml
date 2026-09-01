@@ -21,7 +21,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
+          flutter-version: '3.27.4'
           channel: 'stable'
 
       - name: Create Flutter project structure
@@ -32,6 +32,10 @@ jobs:
           if [ -d "frontend/assets" ]; then
             cp -r frontend/assets/* temp_project/assets/
           fi
+
+      - name: Update Kotlin version
+        run: |
+          sed -i "s/ext.kotlin_version = '.*'/ext.kotlin_version = '1.9.0'/" temp_project/android/build.gradle
 
       - name: Install dependencies
         run: flutter pub get
