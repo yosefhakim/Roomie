@@ -24,16 +24,25 @@ jobs:
           flutter-version: '3.24.0'
           channel: 'stable'
 
+      - name: Create Flutter project structure
+        run: |
+          flutter create -t app temp_project
+          cp -r frontend/lib/* temp_project/lib/
+          cp frontend/pubspec.yaml temp_project/pubspec.yaml
+          if [ -d "frontend/assets" ]; then
+            cp -r frontend/assets/* temp_project/assets/
+          fi
+
       - name: Install dependencies
         run: flutter pub get
-        working-directory: frontend
+        working-directory: temp_project
 
       - name: Build APK
         run: flutter build apk --release
-        working-directory: frontend
+        working-directory: temp_project
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Roomie-Release-APK
-          path: frontend/build/app/outputs/flutter-apk/app-release.apk
+          path: temp_project/build/app/outputs/flutter-apk/app-release.apk
