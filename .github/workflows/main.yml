@@ -21,7 +21,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.4'
+          flutter-version: '3.24.0'
           channel: 'stable'
 
       - name: Create Flutter project structure
@@ -33,16 +33,12 @@ jobs:
             cp -r frontend/assets/* temp_project/assets/
           fi
 
-      - name: Update Gradle and Kotlin versions
+      - name: Update Android Gradle Plugin
         run: |
-          # Update Android Gradle Plugin to 8.1.4
-          sed -i "s/classpath 'com.android.tools.build:gradle:[0-9.]*/classpath 'com.android.tools.build:gradle:8.1.4/" temp_project/android/build.gradle
-          
-          # Update Kotlin version to 1.9.0
-          sed -i "s/ext.kotlin_version = '.*'/ext.kotlin_version = '1.9.0'/" temp_project/android/build.gradle
-          
-          # Update Gradle wrapper to 8.0
-          sed -i "s/distributionUrl=.*gradle-[0-9.]*-bin.zip/distributionUrl=https\:\/\/services.gradle.org\/distributions\/gradle-8.0-bin.zip/" temp_project/android/gradle/wrapper/gradle-wrapper.properties
+          cd temp_project/android
+          sed -i "s/classpath 'com.android.tools.build:gradle:[0-9.]*'/classpath 'com.android.tools.build:gradle:8.1.4'/" build.gradle
+          sed -i "s/ext.kotlin_version = '[^']*'/ext.kotlin_version = '1.9.0'/" build.gradle
+          sed -i "s|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-8.0-bin.zip|" gradle/wrapper/gradle-wrapper.properties
 
       - name: Install dependencies
         run: flutter pub get
