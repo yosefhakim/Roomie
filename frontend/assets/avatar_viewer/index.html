@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <style>
+    html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; height: 100%; }
+    #scene-container { width: 100%; height: 100%; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <div id="scene-container"></div>
+
+  <!--
+    Loaded from a CDN rather than bundled locally. This is a deliberate,
+    documented tradeoff (see frontend README's honest-limitations section):
+    it means avatar rendering requires network access and depends on the
+    CDN's availability, which is a real production concern (consider
+    self-hosting these under your own CDN/asset pipeline before shipping).
+    It keeps this file self-contained and easy to audit for a from-scratch
+    build, at the cost of an external runtime dependency.
+  -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
+
+  <script>
+    // ---------------------------------------------------------------------
+    // Minimal JS <-> Flutter bridge contract (see avatar_3d_viewer.dart):
+    //
+    // Flutter -> JS: window.receiveFromFlutter(jsonMessage)
+    //   { type: 'loadModel', url: '<glTF/GLB URL>' }
+    //   { type: 'setAnimation', state: 'idle' | 'talking' | 'waving' | 'celebrating' }
+    //
+    // JS -> Flutter: RoomieAvatarBridge.postMessage(jsonMessage)
+    //   { type: 'loaded' }
+    //   { type: 'error', message: '<details>' }
+    // ---------------------------------------------------------------------
+
+    function postToFlutter(payload) {
+      if (window.RoomieAvatarBridge) {
+        window.RoomieAvatarBridge.postMessage(JSON.stringify(payload));
+      }
+    }
+
+    let scene, camera, renderer, currentModel, mixer, clock;
+    let animationActions = {};
+    let activeAction = null;
+
+    function initScene() {
+      scene = new THREE.Scene();
+
+      camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+      camera.position.set(0, 1.5, 2.2);
+      camera.lookAt(0, 1.4, 0);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(window.devicePixelRatio || 1);
+      const container = document.getElementById('scene-container');
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      container.appendChild(renderer.domElement);
+
+      const ambient = new THREE.AmbientLight(0xffffff, 0.9);
+      scene.add(ambient);
+      const directional = new THREE.DirectionalLight(0xffffff, 0.6);
+      directional.position.set(1, 2, 2);
+      scene.add(directional);
+
+      clock = new THREE.Clock();
+      animate();
+
+      window.addEventListener('resize', onResize);
+    }
+
+    function onResize() {
+      const container = document.getElementById('scene-container');
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      if (mixer) mixer.update(delta);
+      if (currentModel) {
+        // Gentle idle bob/rotation as a fallback when the model has no
+        // baked-in idle animation clip - purely cosmetic, cheap to compute.
+        currentModel.rotation.y += delta * 0.15;
+      }
+      renderer.render(scene, camera);
+    }
+
+    function loadModel(url) {
+      if (!url) {
+        postToFlutter({ type: 'error', message: 'No model URL provided' });
+        return;
+      }
+
+      const loader = new THREE.GLTFLoader();
+      loader.load(
+        url,
+        (gltf) => {
+          if (currentModel) scene.remove(currentModel);
+          currentModel = gltf.scene;
+
+          // Center and scale to a consistent frame - Ready Player Me
+          // avatars are typically full-body; we frame roughly head/bust
+          // level for the small circular tile this renders into.
+          const box = new THREE.Box3().setFromObject(currentModel);
+          const size = box.getSize(new THREE.Vector3());
+          const scale = 1.6 / Math.max(size.y, 0.1);
+          currentModel.scale.setScalar(scale);
+          const center = box.getCenter(new THREE.Vector3());
+          currentModel.position.set(-center.x * scale, -center.y * scale + 0.9, -center.z * scale);
+
+          scene.add(currentModel);
+
+          if (gltf.animations && gltf.animations.length > 0) {
+            mixer = new THREE.AnimationMixer(currentModel);
+            animationActions = {};
+            for (const clip of gltf.animations) {
+              animationActions[clip.name.toLowerCase()] = mixer.clipAction(clip);
+            }
+            const idleKey = Object.keys(animationActions).find((k) => k.includes('idle'));
+            if (idleKey) {
+              activeAction = animationActions[idleKey];
+              activeAction.play();
+            }
+          }
+
+          postToFlutter({ type: 'loaded' });
+        },
+        undefined,
+        (error) => {
+          postToFlutter({ type: 'error', message: String(error) });
+        }
+      );
+    }
+
+    function setAnimationState(state) {
+      // Maps our four semantic states to whatever animation clips the
+      // loaded model actually has (Ready Player Me exports vary). Falls
+      // back to silently doing nothing if no matching clip exists, rather
+      // than throwing - not every avatar will have a full animation set.
+      const clipKey = Object.keys(animationActions).find((k) => k.includes(state));
+      if (!clipKey) return;
+
+      const nextAction = animationActions[clipKey];
+      if (activeAction && activeAction !== nextAction) {
+        activeAction.fadeOut(0.25);
+      }
+      nextAction.reset().fadeIn(0.25).play();
+      activeAction = nextAction;
+    }
+
+    window.receiveFromFlutter = function (json) {
+      try {
+        const message = typeof json === 'string' ? JSON.parse(json) : json;
+        if (message.type === 'loadModel') {
+          loadModel(message.url);
+        } else if (message.type === 'setAnimation') {
+          setAnimationState(message.state);
+        }
+      } catch (err) {
+        postToFlutter({ type: 'error', message: 'Bad message from Flutter: ' + String(err) });
+      }
+    };
+
+    initScene();
+  </script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+name: roomie
+description: Roomie - real-time multiplayer social gaming app
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+  flutter: '>=3.19.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+
+  # Networking
+  dio: ^5.4.3+1
+  socket_io_client: ^2.0.3+1
+
+  # Secure token storage
+  flutter_secure_storage: ^9.2.2
+
+  # Voice chat (Agora RTC Engine - Flutter SDK)
+  agora_rtc_engine: ^6.3.2
+  permission_handler: ^11.3.1
+
+  # 3D avatars - rendering a glTF/GLB model (e.g. from Ready Player Me)
+  # inside the Flutter widget tree via a WebView-hosted Three.js scene.
+  # See lib/widgets/avatar_3d_viewer.dart for the rationale on this
+  # approach vs. a native Flutter 3D engine.
+  webview_flutter: ^4.8.0
+
+  # Animations
+  lottie: ^3.1.2
+  flutter_animate: ^4.5.0
+
+  # UI utilities
+  cached_network_image: ^3.3.1
+  google_fonts: ^6.2.1
+  flutter_svg: ^2.0.10+1
+  intl: ^0.19.0
+
+  # Routing
+  go_router: ^14.2.0
+
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  riverpod_generator: ^2.4.0
+  build_runner: ^2.4.11
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/animations/
+    - assets/images/
+    - assets/avatar_viewer/
