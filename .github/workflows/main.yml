@@ -1,0 +1,65 @@
+name: Build Flutter APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+
+      - name: Create Flutter project structure
+        run: |
+          flutter create -t app temp_project
+          cp -r frontend/lib/* temp_project/lib/
+          cp frontend/pubspec.yaml temp_project/pubspec.yaml
+          if [ -d "frontend/assets" ]; then
+            cp -r frontend/assets/* temp_project/assets/
+          fi
+
+      - name: Fix Kotlin and Gradle Versions
+        run: |
+          cd temp_project/android
+          
+          # 1. تحديث Kotlin في settings.gradle (المطلوب حسب رسالة الخطأ)
+          sed -i 's/id "org.jetbrains.kotlin.android" version "[^"]*"/id "org.jetbrains.kotlin.android" version "1.9.0"/' settings.gradle
+          
+          # 2. تحديث Kotlin في build.gradle (كاحتياط)
+          sed -i "s/ext.kotlin_version = '.*'/ext.kotlin_version = '1.9.0'/" build.gradle
+          
+          # 3. تحديث Android Gradle Plugin إلى 8.3.0
+          sed -i 's/id "com.android.application" version "[^"]*"/id "com.android.application" version "8.3.0"/' settings.gradle
+          sed -i "s/classpath 'com.android.tools.build:gradle:[^']*'/classpath 'com.android.tools.build:gradle:8.3.0'/" build.gradle
+          
+          # 4. تحديث Gradle Wrapper إلى 8.4
+          sed -i "s|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-8.4-bin.zip|" gradle/wrapper/gradle-wrapper.properties
+
+      - name: Install dependencies
+        run: flutter pub get
+        working-directory: temp_project
+
+      - name: Build APK
+        run: flutter build apk --release
+        working-directory: temp_project
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Roomie-Release-APK
+          path: temp_project/build/app/outputs/flutter-apk/app-release.apk
