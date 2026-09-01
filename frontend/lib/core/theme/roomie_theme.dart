@@ -49,7 +49,7 @@ class RoomieTheme {
         centerTitle: false,
         foregroundColor: RoomieColors.textPrimary,
       ),
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme(
         color: RoomieColors.surfaceRaised,
         elevation: 0,
         shape: RoundedRectangleBorder(
